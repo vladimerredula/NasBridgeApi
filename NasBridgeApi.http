@@ -1,0 +1,6 @@
+@NasBridgeApi_HostAddress = http://localhost:55000
+
+GET {{NasBridgeApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
