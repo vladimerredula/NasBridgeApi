@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
 using NasBridgeApi.Models;
 using SharpCifs.Smb;
-using System.Drawing;
 
 namespace NasBridgeApi.Services
 {
@@ -20,7 +19,8 @@ namespace NasBridgeApi.Services
 
         public async Task<List<NasEntry>> ListFilesAsync(string relativePath = "")
         {
-            string path = _baseUrl + relativePath;
+            string path = Path.Combine(_baseUrl, relativePath);
+            path = path.EndsWith("/") ? path : path + "/";
             var dir = new SmbFile(path, _auth);
 
             if (!dir.Exists())
@@ -46,13 +46,44 @@ namespace NasBridgeApi.Services
             }).OrderBy(e => e.Type).ThenBy(e => e.Name).ToList();
         }
 
-        public async Task UploadFileAsync(string relativePath, Stream stream)
+        public async Task UploadFileAsync(string relativePath, Stream stream, bool overwrite = true)
         {
-            string path = _baseUrl + relativePath;
-            var file = new SmbFile(path, _auth);
+            string fullPath = Path.Combine(_baseUrl, relativePath).Replace("\\", "/");
+
+            var directory = Path.GetDirectoryName(fullPath) ?? "";
+            var originalFileName = Path.GetFileNameWithoutExtension(fullPath);
+            var extension = Path.GetExtension(fullPath);
+
+            var targetPath = fullPath;
+            var file = new SmbFile(targetPath, _auth);
+
+            // Ensure parent directory exists
+            var parent = new SmbFile(file.GetParent(), _auth);
+            if (!parent.Exists())
+            {
+                parent.Mkdirs(); // recursively create missing folders
+            }
 
             if (file.Exists())
-                await file.DeleteAsync(); // overwrite
+            {
+                if (overwrite)
+                {
+                    await file.DeleteAsync(); // overwrite
+                }
+                else
+                {
+                    int counter = 1;
+                    string newFileName;
+                    do
+                    {
+                        newFileName = $"{originalFileName}_{counter}{extension}";
+                        targetPath = Path.Combine(directory, newFileName).Replace("\\", "/");
+                        file = new SmbFile(targetPath, _auth);
+                        counter++;
+                    }
+                    while (file.Exists());
+                }
+            }
 
             using var outStream = await file.GetOutputStreamAsync();
             await stream.CopyToAsync(outStream);
@@ -61,7 +92,7 @@ namespace NasBridgeApi.Services
 
         public async Task<Stream> DownloadFileAsync(string relativePath)
         {
-            string path = _baseUrl + relativePath;
+            string path = Path.Combine(_baseUrl, relativePath);
             var file = new SmbFile(path, _auth);
 
             if (!file.Exists())
@@ -72,11 +103,17 @@ namespace NasBridgeApi.Services
 
         public async Task DeleteFileAsync(string relativePath)
         {
-            string path = _baseUrl + relativePath;
+            string path = Path.Combine(_baseUrl, relativePath);
             var file = new SmbFile(path, _auth);
 
             if (file.Exists())
                 await file.DeleteAsync();
+        }
+        public async Task<bool> FileExistsAsync(string relativePath)
+        {
+            string path = Path.Combine(_baseUrl, relativePath).Replace("\\", "/");
+            var file = new SmbFile(path, _auth);
+            return file.Exists();
         }
 
         private string FormatBytes(long bytes)
