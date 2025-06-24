@@ -12,6 +12,8 @@ builder.Services.AddSwaggerGen();
 builder.Services.Configure<NasSettings>(builder.Configuration.GetSection("NasSettings"));
 builder.Services.AddSingleton<NasService>();
 
+builder.WebHost.UseUrls("http://0.0.0.0:80");
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
