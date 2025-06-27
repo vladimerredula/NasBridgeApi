@@ -50,7 +50,7 @@ namespace NasBridgeApi.Services
         {
             string fullPath = Path.Combine(_baseUrl, relativePath).Replace("\\", "/");
 
-            var directory = Path.GetDirectoryName(fullPath) ?? "";
+            var directory = GetSmbDirectory(fullPath) ?? "";
             var originalFileName = Path.GetFileNameWithoutExtension(fullPath);
             var extension = Path.GetExtension(fullPath);
 
@@ -125,6 +125,18 @@ namespace NasBridgeApi.Services
             if (mb < 1024) return $"{mb:F1} MB";
             double gb = mb / 1024.0;
             return $"{gb:F1} GB";
+        }
+        private string GetSmbDirectory(string smbPath)
+        {
+            if (string.IsNullOrEmpty(smbPath)) return smbPath;
+
+            smbPath = smbPath.Replace("\\", "/");
+
+            int lastSlashIndex = smbPath.LastIndexOf('/');
+            if (lastSlashIndex <= "smb://".Length)
+                return smbPath; // no deeper folder
+
+            return smbPath.Substring(0, lastSlashIndex);
         }
     }
 }
